@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>지점 예약현황</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* 지점 하자 접수 앱과 같은 톤: 옅은 회녹색 바탕 + 짙은 청록 강조, 한 줄 카드 목록 */
+:root {
+  --bg: #F4F5F2; --surface: #FFFFFF; --sunk: #ECEEEA; --line: #D5D9D2; --line-strong: #B9BFB6;
+  --fg: #161B18; --muted: #555D58; --accent: #1D5A54; --accent-ink: #FFFFFF; --accent-soft: #DCEBE8;
+  --warn: #8A4F00; --warn-soft: #FCEBCF; --bad: #A12D1B; --bad-soft: #F9DDD5; --good: #276128; --good-soft: #DCEFD8;
+  --hold: #4F5675; --hold-soft: #E3E5F0;
+  --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 12px;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #121614; --surface: #1B201D; --sunk: #232925; --line: #333B36; --line-strong: #4A534D; --fg: #EBEFEC; --muted: #A4ADA7;
+  --accent: #82C7BD; --accent-ink: #0E1917; --accent-soft: #1E3431;
+  --warn: #F2BC66; --warn-soft: #3A2C14; --bad: #F4907C; --bad-soft: #3F211A; --good: #95CF90; --good-soft: #1D321F;
+  --hold: #B4B9D2; --hold-soft: #282B39; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #121614; --surface: #1B201D; --sunk: #232925; --line: #333B36; --line-strong: #4A534D; --fg: #EBEFEC; --muted: #A4ADA7;
+  --accent: #82C7BD; --accent-ink: #0E1917; --accent-soft: #1E3431;
+  --warn: #F2BC66; --warn-soft: #3A2C14; --bad: #F4907C; --bad-soft: #3F211A; --good: #95CF90; --good-soft: #1D321F;
+  --hold: #B4B9D2; --hold-soft: #282B39; color-scheme: dark; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 16px; line-height: 1.6; word-break: keep-all; overflow-wrap: anywhere; }
+.wrap { max-width: 720px; margin: 0 auto; padding-block: 20px 72px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 18px; }
+.wrap > * { min-width: 0; }
+h1 { font-size: 24px; line-height: 1.3; margin: 0; letter-spacing: -0.01em; }
+h2 { font-size: 18px; line-height: 1.4; margin: 0; }
+p { margin: 0; }
+header.top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.lockname { display: inline-block; margin-top: 6px; font-size: 15px; font-weight: 700; color: var(--accent); background: var(--accent-soft); border-radius: 8px; padding: 3px 10px; }
+.stamp { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+button, select, input, textarea { font: inherit; color: inherit; }
+.btn { border: 1px solid var(--line-strong); background: var(--surface); padding: 10px 16px; border-radius: 9px; cursor: pointer; font-weight: 600; font-size: 15px; min-height: 44px; }
+.btn:hover { border-color: var(--fg); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn.small { min-height: 34px; padding: 4px 12px; font-size: 14px; }
+.btn:disabled { opacity: .5; cursor: default; }
+:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.notice { font-size: 15px; background: var(--accent-soft); border-radius: 10px; padding: 12px 14px; }
+.notice.bad { color: var(--bad); background: var(--bad-soft); }
+.notice.warn { color: var(--warn); background: var(--warn-soft); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); padding: 18px; display: grid; gap: 14px; }
+.panel-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.panel-h small { color: var(--muted); font-size: 13px; }
+
+/* 오늘·내일 */
+.duo { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .duo { grid-template-columns: 1fr; } }
+.day-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.day-h .d { font-family: var(--font-mono); font-weight: 600; font-size: 15px; color: var(--muted); }
+.counts { display: flex; gap: 6px; flex-wrap: wrap; }
+.chip { display: inline-flex; align-items: center; gap: 4px; border-radius: 999px; padding: 2px 10px; font-size: 13px; font-weight: 600; background: var(--sunk); color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.chip.sold { background: var(--accent-soft); color: var(--accent); }
+.chip.empty { background: var(--sunk); color: var(--muted); }
+.chip.block { background: var(--hold-soft); color: var(--hold); }
+.chip.cancel { background: var(--bad-soft); color: var(--bad); }
+.chip.ask, .chip.other { background: var(--warn-soft); color: var(--warn); }
+.chip.stay { background: var(--good-soft); color: var(--good); }
+
+/* 예약 한 줄 */
+.bk { display: grid; grid-template-columns: 4.6em minmax(0, 1fr); gap: 10px; padding: 12px 0; border-top: 1px solid var(--line); }
+.bk:first-child { border-top: 0; padding-top: 2px; }
+.bk .room { font-weight: 700; font-size: 15px; line-height: 1.35; }
+.bk .who { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; }
+.bk .nm { font-weight: 700; font-size: 16px; }
+.bk .meta { font-size: 14px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 12px; font-variant-numeric: tabular-nums; }
+.bk .tel { color: var(--accent); font-weight: 600; text-decoration: none; font-family: var(--font-mono); font-size: 14px; }
+.bk .memo { font-size: 14px; background: var(--sunk); border-radius: 8px; padding: 6px 10px; margin-top: 6px; }
+.bk .memo b { font-weight: 600; color: var(--muted); margin-right: 4px; }
+.bk .acts { margin-top: 6px; }
+.bk.dim .room, .bk.dim .meta { color: var(--muted); font-weight: 500; }
+.linkbtn { background: none; border: 0; padding: 0; color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 3px; font-size: 14px; }
+.empty-line { color: var(--muted); font-size: 14px; }
+
+/* 14일 목록 */
+details.day { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); }
+details.day + details.day { margin-top: 8px; }
+details.day > summary { list-style: none; cursor: pointer; padding: 12px 14px; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center; min-height: 52px; }
+details.day > summary::-webkit-details-marker { display: none; }
+details.day > summary .dt { font-family: var(--font-mono); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+details.day > summary .dt .w { font-family: var(--font-body); margin-left: 4px; }
+details.day > summary .dt .w.sun { color: var(--bad); }
+details.day > summary .dt .w.sat { color: var(--hold); }
+details.day > summary .arr { color: var(--muted); transition: transform .15s; }
+details.day[open] > summary .arr { transform: rotate(90deg); }
+details.day .inner { padding: 0 14px 12px; }
+.tag-today { font-size: 12px; font-weight: 700; color: var(--accent-ink); background: var(--accent); border-radius: 6px; padding: 1px 6px; margin-left: 6px; font-family: var(--font-body); }
+
+/* 쓰기 */
+form.note { display: grid; gap: 14px; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+@media (max-width: 480px) { .grid2 { grid-template-columns: 1fr; } }
+label.f { display: grid; gap: 6px; font-size: 14px; font-weight: 600; color: var(--muted); min-width: 0; }
+.f input, .f select, .f textarea { width: 100%; border: 1px solid var(--line-strong); background: var(--surface); border-radius: 9px; padding: 11px 13px; font-weight: 400; color: var(--fg); font-size: 16px; min-height: 46px; }
+.f textarea { min-height: 110px; resize: vertical; line-height: 1.55; }
+.cnt { font-size: 13px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; font-weight: 500; }
+.cnt.over { color: var(--bad); font-weight: 700; }
+.formfoot { display: flex; justify-content: flex-end; gap: 10px; flex-wrap: wrap; align-items: center; }
+.formfoot .msg { margin-right: auto; font-size: 14px; color: var(--muted); }
+.formfoot .msg.bad { color: var(--bad); font-weight: 600; }
+.formfoot .msg.good { color: var(--good); font-weight: 600; }
+
+.nt { padding: 12px 0; border-top: 1px solid var(--line); display: grid; gap: 4px; }
+.nt:first-child { border-top: 0; padding-top: 0; }
+.nt .h { font-size: 13px; color: var(--muted); display: flex; gap: 4px 10px; flex-wrap: wrap; font-variant-numeric: tabular-nums; }
+.nt .h b { color: var(--fg); }
+.nt .t { white-space: pre-wrap; font-size: 15px; }
+.skel { height: 64px; border-radius: var(--r); background: var(--sunk); }
+/* 움직임: transform·opacity만, 짧게. 내용은 기본으로 보이고 처음 한 번만 떠오른다 */
+.btn, .linkbtn, details.day > summary { transition: transform .16s ease, border-color .16s ease, background-color .16s ease; }
+.btn:active:not(:disabled) { transform: scale(.96); }
+details.day > summary:active { transform: scale(.99); }
+.btn .ico { display: inline-block; width: 16px; height: 16px; vertical-align: -3px; margin-right: 6px; }
+.btn.spin .ico { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.intro .rise { animation: rise .42s cubic-bezier(.2,.7,.2,1) both; animation-delay: calc(var(--i, 0) * 55ms); }
+@keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+details.day[open] .inner.anim { animation: drop .22s ease-out both; }
+@keyframes drop { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: none; } }
+.panel.today { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.panel.today .day-h h2 { color: var(--accent); }
+.big { display: flex; align-items: baseline; gap: 2px; font-variant-numeric: tabular-nums; }
+.big .num { font-family: var(--font-mono); font-size: 30px; font-weight: 600; line-height: 1; min-width: 1.2ch; text-align: right; color: var(--accent); }
+.big .unit { font-size: 15px; font-weight: 600; color: var(--muted); }
+.big + .big { margin-left: 14px; }
+.big.stay .num { color: var(--good); }
+.bk.new { animation: flash 1.6s ease-out 1; }
+@keyframes flash { from { background: var(--accent-soft); } to { background: transparent; } }
+.ok-check { display: inline-flex; align-items: center; gap: 6px; }
+.ok-check svg { width: 20px; height: 20px; flex: none; }
+.ok-check circle { fill: var(--good-soft); }
+.ok-check path { fill: none; stroke: var(--good); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 20; stroke-dashoffset: 20; animation: draw .45s .05s ease-out forwards; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+.nt.fresh { animation: rise .35s ease-out both; }
+.pulse { position: relative; }
+.pulse::before { content: ""; display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--good); margin-right: 6px; vertical-align: 1px; }
+.loading .pulse::before { background: var(--warn); animation: blink 1s ease-in-out infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+  .ok-check path { stroke-dashoffset: 0; }
+}
+</style>
+</head>
+<body class="intro">
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>예약현황</h1>
+      <span class="lockname" id="brName"></span>
+    </div>
+    <div style="display:grid;justify-items:end;gap:4px">
+      <button class="btn small" type="button" id="refreshBtn"><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.34-5.66M20 4v5h-5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>새로고침</button>
+      <span class="stamp pulse" id="stamp" aria-live="polite"></span>
+    </div>
+  </header>
+
+  <p class="notice bad" id="noLink" hidden>지점 전용 링크로 열어 주세요. 링크가 없거나 바뀌었다면 본사에 새 링크를 받아 주세요.</p>
+  <p class="notice bad" id="err" hidden></p>
+  <p class="notice warn" id="missing" hidden></p>
+
+  <div id="main">
+    <div style="display:grid;gap:18px">
+      <section class="duo" id="duo">
+        <div class="skel"></div><div class="skel"></div>
+      </section>
+
+      <section class="panel rise" style="--i:2" aria-labelledby="h14">
+        <div class="panel-h"><h2 id="h14">14일 예약</h2><small>날짜를 누르면 객실별로 펼쳐져요</small></div>
+        <div id="days"></div>
+      </section>
+
+      <section class="panel rise" style="--i:3" id="writePanel" aria-labelledby="hw">
+        <div class="panel-h"><h2 id="hw">특이사항 쓰기</h2><small>본사가 확인해요</small></div>
+        <form class="note" id="noteForm" novalidate>
+          <div class="grid2">
+            <label class="f" for="nDate">날짜<select id="nDate" required></select></label>
+            <label class="f" for="nRoom">객실<select id="nRoom" required></select></label>
+          </div>
+          <label class="f" for="nText">내용
+            <textarea id="nText" maxlength="1000" placeholder="예: 레브 2호 손님 얼리체크인 요청, 13시 입실 안내함 / 소유 1호 수건 부족" required></textarea>
+            <span class="cnt" id="nCnt">0 / 1000</span>
+          </label>
+          <label class="f" for="nWriter">작성자 (선택)<input id="nWriter" maxlength="20" autocomplete="name" placeholder="예: 김 실장"></label>
+          <div class="formfoot">
+            <span class="msg" id="nMsg" aria-live="polite"></span>
+            <button class="btn primary" type="submit" id="nSave">저장</button>
+          </div>
+        </form>
+      </section>
+
+      <section class="panel rise" style="--i:4" aria-labelledby="hn">
+        <div class="panel-h"><h2 id="hn">최근 특이사항</h2><small>지난 30일 · 이 지점만</small></div>
+        <div id="notes"></div>
+      </section>
+    </div>
+  </div>
+</div>
+
+<script>
+  var BRANCH_CODE = (new URLSearchParams(location.search).get('b') || '').replace(/[^a-z0-9-]/gi, '').toLowerCase().slice(0, 40);
+  var BRANCH_NAME = '';
+  var API_URL = 'https://script.google.com/macros/s/AKfycbzrJt_j8NJ237LcgDZZ3HbGdGagV4XrHlddHKm38kIxAvmrCmuwTrjZ0E-9_DFmwtme/exec';
+  var AUTO_MS = 90 * 1000;   // 90초마다 시트를 다시 읽음 (화면이 보일 때만)
+
+  var S = { data: null, busy: false, lastAt: null, open: {} };
+  function $(id) { return document.getElementById(id); }
+  function esc(s) { return String(s === null || s === undefined ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function call(fn) {
+    var args = Array.prototype.slice.call(arguments, 1);
+    return fetch(API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify({ fn: fn, args: args }) })
+      .then(function (r) { if (!r.ok) throw new Error('서버에 연결하지 못했어요 (' + r.status + '). 잠시 후 다시 해 주세요.'); return r.json(); })
+      .then(function (j) {
+        if (!j || !j.ok) throw new Error((j && j.error) || '서버 오류가 났어요.');
+        if (fn === 'getView' && j.data && j.data.branch && j.data.branch !== BRANCH_NAME) {
+          BRANCH_NAME = j.data.branch; var el = $('brName'); if (el) el.textContent = BRANCH_NAME; document.title = BRANCH_NAME + ' 예약현황';
+        }
+        return j.data;
+      })
+      ['catch'](function (e) { throw { message: (e && e.message) || String(e) }; });
+  }
+  function md(ymd) { var p = ymd.split('-'); return (+p[1]) + '/' + (+p[2]); }
+  function hhmm(d) { return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function telHref(p) { return 'tel:' + String(p).replace(/[^0-9+]/g, ''); }
+  function isMissing(ymd) { return S.data && (S.data.missing || []).indexOf(ymd.slice(0, 7)) >= 0; }
+
+  function countOf(items) {
+    var c = { sold: 0, empty: 0, block: 0, cancel: 0, ask: 0, other: 0 };
+    items.forEach(function (b) { c[b.state] = (c[b.state] || 0) + 1; });
+    return c;
+  }
+  function chips(items) {
+    var c = countOf(items), out = [];
+    [['sold', '판매'], ['empty', '공실'], ['block', '차단'], ['cancel', '취소'], ['ask', '문의'], ['other', '기타']].forEach(function (k) {
+      if (c[k[0]]) out.push('<span class="chip ' + k[0] + '">' + k[1] + ' ' + c[k[0]] + '</span>');
+    });
+    return out.join('');
+  }
+  function bookingRow(b, opts) {
+    var guest = b.state !== 'empty';
+    var stateTxt = b.stateLabel + (b.stateRaw && b.stateRaw !== b.stateLabel && b.state !== 'sold' && b.state !== 'empty' ? ' · ' + b.stateRaw : '');
+    var h = '<div class="bk' + (guest ? '' : ' dim') + '"><div class="room">' + esc(b.room) + '</div><div>';
+    h += '<div class="who"><span class="chip ' + b.state + '">' + esc(stateTxt) + '</span>';
+    if (b.stayDay) h += '<span class="chip stay">연박 ' + b.stayDay + '일차</span>';
+    else if (b.state === 'sold' && b.stayNights > 1) h += '<span class="chip stay">' + b.stayNights + '박 체크인</span>';
+    if (b.name) h += '<span class="nm">' + esc(b.name) + '</span>';
+    h += '</div>';
+    if (guest) {
+      var meta = [];
+      if (b.phone) meta.push('<a class="tel" href="' + esc(telHref(b.phone)) + '">' + esc(b.phone) + '</a>');
+      if (b.people) meta.push('인원 ' + esc(b.people) + (/^\d+$/.test(b.people) ? '명' : ''));
+      if (b.ota) meta.push(esc(b.ota));
+      if (b.pay) meta.push('결제 ' + esc(b.pay));
+      if (b.checkin) meta.push('입실 ' + esc(b.checkin));
+      if (meta.length) h += '<div class="meta">' + meta.join('<span aria-hidden="true">·</span>') + '</div>';
+      if (b.memo) h += '<div class="memo"><b>메모</b>' + esc(b.memo) + '</div>';
+    }
+    if (guest) h += '<div class="acts"><button type="button" class="linkbtn" data-note="' + esc(b.date) + '|' + esc(b.room) + '">특이사항 쓰기</button></div>';
+    return h + '</div></div>';
+  }
+
+  function renderDuo() {
+    var d = S.data, el = $('duo'), html = '';
+    [0, 1].forEach(function (i) {
+      var day = d.days[i]; if (!day) return;
+      var guests = day.items.filter(function (b) { return b.state === 'sold'; });
+      var arrivals = guests.filter(function (b) { return !b.stayDay; }), stays = guests.filter(function (b) { return b.stayDay; });
+      html += '<div class="panel rise' + (i ? '' : ' today') + '" style="--i:' + i + '"><div class="panel-h"><div class="day-h"><h2>' + (i ? '내일' : '오늘') + '</h2><span class="d">' + md(day.date) + ' (' + day.dow + ')</span></div>';
+      html += '<div style="display:flex" aria-label="체크인 ' + arrivals.length + '실, 연박 ' + stays.length + '실"><span class="big"><span class="num" data-count="' + arrivals.length + '">' + arrivals.length + '</span><span class="unit">실 체크인</span></span>' + (stays.length ? '<span class="big stay"><span class="num" data-count="' + stays.length + '">' + stays.length + '</span><span class="unit">실 연박</span></span>' : '') + '</div></div>';
+      if (isMissing(day.date) && !day.items.length) html += '<p class="empty-line">본사 입력 전이에요.</p>';
+      else if (!guests.length) html += '<p class="empty-line">예약 손님이 없어요.' + (day.items.length ? ' (' + chips(day.items).replace(/<[^>]+>/g, ' ').trim() + ')' : '') + '</p>';
+      else html += '<div>' + arrivals.concat(stays).map(function (b) { return bookingRow(b); }).join('') + '</div>';
+      html += '</div>';
+    });
+    el.innerHTML = html;
+  }
+  function renderDays() {
+    var d = S.data;
+    $('days').innerHTML = d.days.map(function (day, i) {
+      var w = day.dow === '일' ? ' sun' : day.dow === '토' ? ' sat' : '';
+      var open = S.open[day.date] ? ' open' : '';
+      var right = (isMissing(day.date) && !day.items.length) ? '<span class="chip">본사 입력 전</span>' : chips(day.items);
+      var body = day.items.length ? day.items.map(function (b) { return bookingRow(b); }).join('') : '<p class="empty-line">' + (isMissing(day.date) ? '이 달 예약표가 아직 없어요. 본사 입력 전이에요.' : '이 날짜 줄이 시트에 없어요.') + '</p>';
+      return '<details class="day" data-date="' + day.date + '"' + open + '><summary><span class="dt">' + md(day.date) + '<span class="w' + w + '">(' + day.dow + ')</span>' + (i === 0 ? '<span class="tag-today">오늘</span>' : '') + '</span>'
+        + '<span class="counts">' + right + '</span><span class="arr" aria-hidden="true">›</span></summary><div class="inner">' + body + '</div></details>';
+    }).join('');
+  }
+  function renderNotes() {
+    var list = (S.data && S.data.notes) || [];
+    $('notes').innerHTML = list.length ? list.map(function (n) {
+      return '<div class="nt"><div class="h"><b>' + esc(n.date ? md(n.date) : '') + ' · ' + esc(n.room) + '</b><span>' + esc(String(n.at).slice(5, 16)) + ' 작성</span>' + (n.writer ? '<span>' + esc(n.writer) + '</span>' : '') + '</div><div class="t">' + esc(n.text) + '</div></div>';
+    }).join('') : '<p class="empty-line">최근 30일 동안 적은 특이사항이 없어요.</p>';
+  }
+  function fillForm() {
+    var d = S.data, ds = $('nDate'), rs = $('nRoom'), keepD = ds.value, keepR = rs.value;
+    ds.innerHTML = d.days.map(function (day) { return '<option value="' + day.date + '">' + md(day.date) + ' (' + day.dow + ')' + (day.date === d.today ? ' 오늘' : '') + '</option>'; }).join('');
+    rs.innerHTML = d.rooms.map(function (r) { return '<option value="' + esc(r) + '">' + esc(r) + '</option>'; }).join('');
+    if (keepD && d.days.some(function (x) { return x.date === keepD; })) ds.value = keepD;
+    if (keepR && d.rooms.indexOf(keepR) >= 0) rs.value = keepR;
+  }
+  function render() { renderDuo(); renderDays(); renderNotes(); fillForm();
+    var miss = (S.data.missing || []).map(function (ym) { return (+ym.slice(5)) + '월'; });
+    $('missing').hidden = !miss.length;
+    $('missing').textContent = miss.length ? miss.join('·') + ' 예약표는 본사 입력 전이에요. 시트가 만들어지면 자동으로 보여요.' : '';
+  }
+  var REDUCE = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function countUp(root) {
+    if (REDUCE) return;
+    [].forEach.call(root.querySelectorAll('[data-count]'), function (el) {
+      var to = +el.getAttribute('data-count'); if (!(to > 0)) return;
+      var t0 = null, dur = 600;
+      function step(t) { if (t0 === null) t0 = t; var k = Math.min(1, (t - t0) / dur); el.textContent = String(Math.round(to * (1 - Math.pow(1 - k, 3)))); if (k < 1) requestAnimationFrame(step); else el.textContent = String(to); }
+      el.textContent = '0'; requestAnimationFrame(step);
+    });
+  }
+  function stamp() { $('stamp').textContent = S.lastAt ? '마지막 불러옴 ' + hhmm(S.lastAt) + ' · 90초마다 자동' : '불러오는 중…'; }
+
+  function load(quiet) {
+    if (S.busy || !BRANCH_CODE) return;
+    S.busy = true; $('refreshBtn').disabled = true; $('refreshBtn').classList.add('spin'); document.body.classList.add('loading'); if (!quiet) $('stamp').textContent = '불러오는 중…';
+    call('getView', BRANCH_CODE).then(function (d) {
+      var first = !S.data; S.data = d; S.lastAt = new Date(); $('err').hidden = true; render();
+      if (first) { countUp($('duo')); setTimeout(function () { document.body.classList.remove('intro'); }, 900); }
+    }).catch(function (e) {
+      $('err').hidden = false; $('err').textContent = '예약표를 불러오지 못했어요. 잠시 후 새로고침을 눌러 주세요. (' + e.message + ')';
+    }).then(function () { S.busy = false; $('refreshBtn').disabled = false; $('refreshBtn').classList.remove('spin'); document.body.classList.remove('loading'); stamp(); });
+  }
+
+  // 특이사항 쓰기
+  $('nText').addEventListener('input', function () { var n = this.value.length; $('nCnt').textContent = n + ' / 1000'; $('nCnt').classList.toggle('over', n > 1000); });
+  try { $('nWriter').value = localStorage.getItem('resv_writer') || ''; } catch (e) {}
+  $('noteForm').addEventListener('submit', function (ev) {
+    ev.preventDefault();
+    var p = { date: $('nDate').value, room: $('nRoom').value, text: $('nText').value.trim(), writer: $('nWriter').value.trim() };
+    var msg = $('nMsg');
+    if (!p.text) { msg.className = 'msg bad'; msg.textContent = '내용을 적어 주세요.'; $('nText').focus(); return; }
+    if (p.text.length > 1000) { msg.className = 'msg bad'; msg.textContent = '1000자까지 적을 수 있어요.'; return; }
+    $('nSave').disabled = true; msg.className = 'msg'; msg.textContent = '저장 중…';
+    try { localStorage.setItem('resv_writer', p.writer); } catch (e) {}
+    call('addNote', BRANCH_CODE, p).then(function (notes) {
+      S.data.notes = notes; renderNotes(); var f = document.querySelector('#notes .nt'); if (f) f.classList.add('fresh');
+      $('nText').value = ''; $('nCnt').textContent = '0 / 1000';
+      msg.className = 'msg good'; msg.innerHTML = '<span class="ok-check"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11"/><path d="M7 12.5l3.2 3.2L17 9"/></svg>저장했어요. 본사에서 확인해요.</span>';
+    }).catch(function (e) { msg.className = 'msg bad'; msg.textContent = e.message || '저장하지 못했어요. 다시 눌러 주세요.'; })
+      .then(function () { $('nSave').disabled = false; });
+  });
+  document.addEventListener('click', function (ev) {
+    var b = ev.target.closest && ev.target.closest('[data-note]'); if (!b) return;
+    var parts = b.getAttribute('data-note').split('|');
+    if ([].some.call($('nDate').options, function (o) { return o.value === parts[0]; })) $('nDate').value = parts[0];
+    $('nRoom').value = parts[1];
+    $('writePanel').scrollIntoView({ behavior: 'smooth', block: 'start' }); setTimeout(function () { $('nText').focus(); }, 350);
+  });
+  document.addEventListener('toggle', function (ev) { var d = ev.target; if (d.classList && d.classList.contains('day')) { S.open[d.getAttribute('data-date')] = d.open; var inn = d.querySelector('.inner'); if (inn) { inn.classList.remove('anim'); if (d.open) { void inn.offsetWidth; inn.classList.add('anim'); } } } }, true);
+  $('refreshBtn').addEventListener('click', function () { load(false); });
+  setInterval(function () { if (!document.hidden) load(true); }, AUTO_MS);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && S.lastAt && Date.now() - S.lastAt > AUTO_MS) load(true); });
+
+  if (!BRANCH_CODE) { $('noLink').hidden = false; $('main').hidden = true; $('refreshBtn').hidden = true; $('brName').hidden = true; }
+  else { $('brName').textContent = BRANCH_NAME; document.title = BRANCH_NAME + ' 예약현황'; stamp(); load(false); }
+</script>
+</body>
+</html>
